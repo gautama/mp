@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <!-- mediapipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+
+    <!-- aframe -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-star-system-component@1.0.0/index.js"></script>
+    <script src="https://unpkg.com/aframe-animation-component@^5.1.2/dist/aframe-animation-component.min.js"></script>
+
+    <!-- Custom shaders for cool textures -->
+    <script src="https://star-shader.glitch.me/js/star-shader.js"></script>
+    <script src="https://gas-giant-shader.glitch.me/js/gas-giant-shader.js"></script>
+    <script src="https://rocky-planet-shader.glitch.me/js/rocky-planet-shader.js"></script>
+    <script src="https://gradient-planet-shader.glitch.me/js/gradient-planet-shader.js"></script>
+    <script src="https://metallic-planet-shader.glitch.me/js/metallic-planet-shader.js"></script>
+    <script src="https://terra-shader.glitch.me/js/terra-shader.js"></script>
+
+    <script src="/js/play-on-click.js"></script>
+    <script src="/js/hide-on-play.js"></script>
+
+</head>
+
+<body>
+    <div class="container">
+        <video class="input_video" width="160" height="120px"></video>
+
+        <!-- aframe scene -->
+        <a-scene embedded>
+            <a-mixin id="rotation"
+                animation="property: rotation; loop: true; from:  0 0 0; to: 0 360 0; dur: 20000; easing: linear;">
+            </a-mixin>
+            <a-mixin id="orbit"
+                animation="property: rotation; loop: true; to: 0 360 0; dur: 40000; easing: linear; pauseEvents: pauseOrbit; resumeEvents: startOrbit">
+            </a-mixin>
+
+            <!-- adding a cursor for look controls-->
+
+            <a-entity position="-5 0 20">
+                <a-camera camera>
+                    <a-cursor material="color: #ff40ff;"></a-cursor>
+                </a-camera>
+            </a-entity>
+
+            <a-sky color="black" opacity="0.5"></a-sky>
+            <a-entity
+                star-system="count: 100; radius: 500; depth: 2; texture: https://cdn.glitch.com/d558c128-2ed0-4284-a0da-4d18b9163ad6%2Fstar.svg?1541105053938;">
+            </a-entity>
+
+            <!-- our star gets the star-shader so it can generate a new type of
+                        star every time we refresh. Adding handle-events here lets us use
+                        our new custom component so when we look at the star it will pause
+                        the orbits, and clicking on it will resume them-->
+
+            <a-sphere id="star" position="0 0 0" radius="4" mixin="rotation" star-shader handle-events></a-sphere>
+
+
+            <!-- some planets made with shaders, a gas giant and a metallic
+                        planet-->
+            <!-- also give the orbits the same class, orbits, so we can control
+                        them with javascipt -->
+            <a-entity id="orbit-gas-giant" mixin="orbit" animation="dur: 90000;" class="orbits">
+                <a-sphere id="gas-giant" position="0 0 30" radius="2.5" mixin="rotation" gas-giant-shader></a-sphere>
+            </a-entity>
+
+            <a-entity id="orbit-metallic" mixin="orbit" class="orbits">
+                <a-sphere id="metallic-planet" position="0 0 15" radius="1" metallic-planet-shader="volcanism: 0;"
+                    mixin="rotation">
+                </a-sphere>
+            </a-entity>
+
+            <a-entity id="orbit-terra" mixin="orbit" class="orbits">
+                <a-sphere id="terra" position="0 0 21" radius="1.75" terra-shader mixin="rotation"></a-sphere>
+            </a-entity>
+
+            <!--here is a rocky planet with a 2 moons -->
+            <a-entity id="orbit-rocky" mixin="orbit" animation="dur: 30000;" class="orbits">
+                <a-entity id="rocky-and-moon" position="0 0 10.5">
+                    <a-entity id="rocky-container">
+                        <a-sphere position="0 0 0" radius=".75" id="rocky-planet" mixin="rotation"
+                            gradient-planet-shader="texture: https://cdn.glitch.com/d558c128-2ed0-4284-a0da-4d18b9163ad6%2FGeneric_Celestia_asteroid_texture.jpg?1541189998715">
+                        </a-sphere>
+                        <a-entity id="moon-container" mixin="orbit">
+                            <a-sphere position="-1 0 0 0" radius=".1" id="moon1"
+                                gradient-planet-shader="texture: https://cdn.glitch.com/d558c128-2ed0-4284-a0da-4d18b9163ad6%2FGeneric_Celestia_asteroid_texture.jpg?1541189998715">
+                            </a-sphere>
+                        </a-entity>
+                        <a-entity id="moon2-container" mixin="orbit" animation="dur: 30000;" class="orbits">
+                            <a-sphere position="-2 0 0 0" radius=".2" id="moon2"
+                                gradient-planet-shader="texture: https://cdn.glitch.com/d558c128-2ed0-4284-a0da-4d18b9163ad6%2FGeneric_Celestia_asteroid_texture.jpg?1541189998715">
+                            </a-sphere>
+                        </a-entity>
+                    </a-entity>
+                </a-entity>
+            </a-entity>
+
+            <!-- An icy planet with two rings-->
+            <a-entity id="orbit-icy" mixin="orbit" class="orbits">
+                <a-entity id="icy-container" position="0 0 40">
+                    <a-sphere radius="1.8" id="icy" rocky-planet-shader="icy: 1;" mixin="rotation"></a-sphere>
+                    <a-entity id="icy-ring-1"
+                        geometry="primitive: torus; radius: 3.2; radiusTubular: 0.1;segmentsTubular: 50"
+                        material="color: #aec2cc;" rotation="-10 90 0" scale="1 1 0.1"></a-entity>
+                    <a-entity id="saturn-ring-2"
+                        geometry="primitive: torus; radius: 2.4; radiusTubular: 0.2;segmentsTubular: 50"
+                        material="color: #dbefed;" rotation="-10 90 0" scale="1 1 0.1"></a-entity>
+                </a-entity>
+            </a-entity>
+
+            <!-- An volcano planet with a ring -->
+            <a-entity id="orbit-volcano" mixin="orbit" animation="dur: 70000;" class="orbits">
+                <a-entity id="volcano-container" position="0 0 6">
+                    <a-sphere id="volcano-planet" radius=".75" metallic-planet-shader="volcanism: 1;" mixin="rotation">
+                    </a-sphere>
+                    <a-entity id="volcano-ring"
+                        geometry="primitive: torus; radius: 1.7; radiusTubular: 0.01;segmentsTubular: 50"
+                        material="color: #EE3A15;" rotation="90 0 0" scale="1 1 0.1"></a-entity>
+                </a-entity>
+            </a-entity>
+
+            <a-assets>
+                <video id="videoBunny" preload="auto" src="https://cdn.aframe.io/videos/bunny.mp4" width="160"
+                    height="90" autoplay loop="true" crossOrigin="anonymous" muted></video>
+                <video id="videoFireworks" preload="auto" src="https://cdn.aframe.io/videos/fireworks.mp4" width="160"
+                    height="90" autoplay loop="true" crossOrigin="anonymous" muted></video>
+            </a-assets>
+
+            <!--
+          SOURCE
+          Title:  Big Buck Bunny
+          Author: Blender Institute
+          URL:    https://peach.blender.org/
+          -->
+            <!-- <a-entity material="shader: flat; src: #videoBunny" geometry="primitive: plane; width: 640; height: 480;"
+                position="0 0 -250" rotation="0 0 0" play-on-click visible="false">
+            </a-entity> -->
+
+            <!--
+                SOURCE
+                Title:  Fireworks
+                Author: Motion Digital
+                URL:    https://www.videvo.net/profile/motiondigital/
+                -->
+            <!-- <a-entity material="shader: flat; src: #videoFireworks" geometry="primitive: plane; width: 160; height: 90"
+                position="0 -60 -200" rotation="0 -35 0" play-on-click visible="false">
+            </a-entity> -->
+            <a-camera>
+                <a-entity position="0 0 -1.5" text="align: center;
+                            width: 6;
+                            wrapCount: 100;
+                            color: black;
+                            value: Click or tap to start video" hide-on-play="#videoFireworks">
+                </a-entity>
+            </a-camera>
+
+            <!-- metapipe canvas -->
+            <canvas id="outputCanvas" class="output_canvas" width="1024px" height="768px"></canvas>
+
+        </a-scene>
+
+
+    </div>
+</body>
+
+<script type="module">
+    const videoElement = document.getElementsByClassName('input_video')[0];
+    const canvasElement = document.getElementsByClassName('output_canvas')[0];
+    const canvasCtx = canvasElement.getContext('2d');
+
+    function onResults(results) {
+
+        if (!results ||
+            !results.segmentationMask ||
+            !results.image) {
+            console.log(`no results`);
+            return;
+        }
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.segmentationMask, 0, 0,
+            canvasElement.width, canvasElement.height);
+
+        // Only overwrite existing pixels.
+        canvasCtx.globalCompositeOperation = 'source-out';
+        canvasCtx.fillStyle = '#e3a857';
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+
+        // Only overwrite missing pixels.
+        canvasCtx.globalCompositeOperation = 'destination-atop';
+
+        if (results.image) {
+            canvasCtx.drawImage(
+                results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+            canvasCtx.globalCompositeOperation = 'source-over';
+            drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
+                { color: '#00FF00', lineWidth: 4 });
+            drawLandmarks(canvasCtx, results.poseLandmarks,
+                { color: '#FF0000', lineWidth: 2 });
+            drawConnectors(canvasCtx, results.faceLandmarks, FACEMESH_TESSELATION,
+                { color: '#C0C0C070', lineWidth: 1 });
+            drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS,
+                { color: '#CC0000', lineWidth: 5 });
+            drawLandmarks(canvasCtx, results.leftHandLandmarks,
+                { color: '#00FF00', lineWidth: 2 });
+            drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS,
+                { color: '#00CC00', lineWidth: 5 });
+            drawLandmarks(canvasCtx, results.rightHandLandmarks,
+                { color: '#FF0000', lineWidth: 2 });
+
+            canvasCtx.restore();
+        }
+    }
+
+    const holistic = new Holistic({
+        locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
+        }
+    });
+    holistic.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: true,
+        smoothSegmentation: true,
+        refineFaceLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    holistic.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => {
+            await holistic.send({ image: videoElement });
+        },
+        width: 1280,
+        height: 720
+    });
+
+    camera.start();
+</script>
+
+</html>

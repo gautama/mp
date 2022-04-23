@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <!-- styles  -->
+    <style>
+        body {
+            background-color: transparent;
+        }
+    </style>
+    <!-- mediapipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- webcam raw video -->
+        <video id="inputVideo" crossorigin="anonymous" playsinline="true" style="display:none"
+            class="input_video"></video>
+
+        <!-- metapipe canvas -->
+        <canvas id="outputCanvas1" style="display:none;background-color: transparent;" width="1024px" height="768px"
+            class="output_canvas1"></canvas>
+        <canvas id="outputCanvas2" style="display:none;background-color: transparent;" width="1024px" height="768px"
+            class="output_canvas2"></canvas>
+        <canvas id="outputCanvas3" style="display:none;background-color: transparent;" width="1024px" height="768px"
+            class="output_canvas3"></canvas>
+        <canvas id="outputCanvas4" style="display:none;background-color: transparent;" width="1024px" height="768px"
+            class="output_canvas4"></canvas>
+        <canvas id="outputCanvas5" style="display:none;background-color: transparent;" width="1024px" height="768px"
+            class="output_canvas5"></canvas>
+
+    </div>
+</body>
+
+<!-- three.js -->
+<script type="importmap">
+        {
+            "imports": {
+                "three": "https://threejs.org/build/three.module.js",
+                "OrbitControls": "https://threejs.org/examples/jsm/controls/OrbitControls.js"
+            }
+        }
+</script>
+
+<script type="module">
+
+    // Find the latest version by visiting https://cdn.skypack.dev/three.
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'https://threejs.org/examples/jsm/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'OrbitControls';
+
+    import * as LIB from './js/mplib.js';
+    const loader = new GLTFLoader();
+
+    let _vector = new THREE.Vector3();
+    let _vector2 = new THREE.Vector3();
+    let _quaternion = new THREE.Quaternion();
+    let _xUnitVector = new THREE.Vector3(1, 0, 0);
+    let _yUnitVector = new THREE.Vector3(0, 1, 0);
+    let _zUnitVector = new THREE.Vector3(0, 0, 1);
+
+
+    const _100UnitVector = (new THREE.Vector3(1, 0, 0)).normalize();
+    const _n1001UnitVector = (new THREE.Vector3(-1, 0, 0)).normalize();
+    const _111UnitVector = (new THREE.Vector3(1, 1, 1)).normalize();
+    const _11n1UnitVector = (new THREE.Vector3(1, 1, -1)).normalize();
+    const _1n11UnitVector = (new THREE.Vector3(1, -1, 1)).normalize();
+    const _1n1n1UnitVector = (new THREE.Vector3(1, -1, -1)).normalize();
+    const _n111UnitVector = (new THREE.Vector3(-1, 1, 1)).normalize();
+    const _n11n1UnitVector = (new THREE.Vector3(-1, 1, -1)).normalize();
+    const _n1n11UnitVector = (new THREE.Vector3(-1, -1, 1)).normalize();
+    const _n1n1n1UnitVector = (new THREE.Vector3(-1, -1, -1)).normalize();
+
+    const staticPVectors = [
+        _100UnitVector,
+        _n1001UnitVector,
+        _111UnitVector,
+        _n111UnitVector,
+        _n1n11UnitVector,
+        _1n11UnitVector,
+        _11n1UnitVector,
+        _1n1n1UnitVector,
+        _n11n1UnitVector,
+        _n1n1n1UnitVector
+    ];
+
+    const markerIndex = {
+        'nose': 0,
+        'leftEyeInner': 1,
+        'leftEye': 2,
+        'leftEyeOuter': 3,
+        'rightEyeInner': 4,
+        'rightEye': 5,
+        'rightEyeOuter': 6,
+        'leftEar': 7,
+        'rightEar': 8,
+        'mouthLeft': 9,
+        'mouthRight': 10,
+        'leftShoulder': 11,
+        'rightShoulder': 12,
+        'leftElbow': 13,
+        'rightElbow': 14,
+        'leftWrist': 15,
+        'rightWrist': 16,
+        'leftPinky': 17,
+        'rightPinky': 18,
+        'leftIndex': 19,
+        'rightIndex': 20,
+        'leftThumb': 21,
+        'rightThumb': 22,
+        'leftHip': 23,
+        'rightHip': 24,
+        'leftKnee': 25,
+        'rightKnee': 26,
+        'leftAnkle': 27,
+        'rightAnkle': 28,
+        'leftHeel': 29,
+        'rightHeel': 30,
+        'leftFootIndex': 31,
+        'rightFootIndex': 32
+    };
+
+    const {
+        scene,
+        camera,
+        renderer
+    } = setupScene();
+
+    LIB.addGridToScene(scene);
+
+    let warriorSkeletons = [];
+    let warriorScene = undefined;
+    let warriorLoaded = false;
+
+    loadWarrior();
+
+    initializeWarrior();
+
+    const {
+        videoTexture,
+        videoMesh
+    } = loadInputVideo();
+
+    const {
+        segmentMaskedTexture,
+        segmentMaskedMesh
+    } = loadSegmentMaskedVideo();
+
+    const {
+        positionMarkersTexture,
+        positionMarkersMesh
+    } = loadPositionMarkersVideo();
+
+    const {
+        faceTexture,
+        faceMesh
+    } = loadFaceMeshVideo();
+
+    const {
+        texture4,
+        mesh4
+    } = loadCanvas4();
+
+    const {
+        texture5,
+        mesh5
+    } = loadCanvas5();
+
+    // functions
+    function setupScene() {
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf4f4f4);
+
+        var ambientLight = new THREE.AmbientLight(0xffffff);
+        scene.add(ambientLight);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        camera.position.set(0, 0, 5); // Set position like this
+
+        var pointLight = new THREE.PointLight(0x040404);
+        pointLight.position.set(0, 0, 6);
+        scene.add(pointLight);
+
+        var pointLight2 = new THREE.PointLight(0x040404);
+        pointLight2.position.set(3, 3, 6);
+        scene.add(pointLight2);
+
+        var pointLight3 = new THREE.PointLight(0x040404);
+        pointLight3.position.set(-3, -3, 6);
+        scene.add(pointLight3);
+
+
+        scene.add(camera);
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        renderer.gammaInput = true;
+        renderer.gammaOutput = true;
+
+        var controls = new OrbitControls(camera, renderer.domElement);
+
+        document.body.appendChild(renderer.domElement);
+
+        return {
+            scene: scene,
+            camera: camera,
+            renderer: renderer
+        };
+    }
+
+    function loadWarrior() {
+        loader.load('/assets/warrior/scene.gltf', function (gltf) {
+            console.log(`adding warrior to scene`);
+            gltf.scene.position.set(0, 0, 0);
+            gltf.scene.scale.set(1, 1, 1);
+            scene.add(gltf.scene);
+
+            warriorScene = gltf.scene;
+
+            console.log(`model=warrior scene=${gltf.scene.name}`);
+
+            const helper = new THREE.SkeletonHelper(gltf.scene);
+            scene.add(helper);
+
+            let bones = getBoneList(gltf.scene);
+            const skeleton = new THREE.Skeleton(bones);
+
+            const rootBone = skeleton.bones[0];
+            scene.add(rootBone);
+
+            warriorSkeletons.push(skeleton);
+
+            warriorLoaded = true;
+        }, undefined, function (error) {
+            console.error(error);
+        });
+    }
+
+    function updateWarrior(results) {
+
+        let warriorSkeleton = warriorSkeletons[0];
+
+        if (!warriorSkeleton) {
+            return;
+        }
+
+        for (var i = 0; i < warriorSkeleton.bones.length; i++) {
+
+            function _applyRotation(vector, vector_obj, vector_original, quaternion) {
+                vector.copy(vector_original);
+                vector.applyQuaternion(quaternion);
+                LIB.positionLineVector(vector_obj, [vector.x, vector.y, vector.z]);
+            }
+
+            let bone = warriorSkeleton.bones[i];
+
+            if (!shouldProcessBone(bone)) {
+                continue;
+            }
+
+            let vInfo = bone.boneVectorInfo;
+            bone.getWorldQuaternion(_quaternion);
+
+            // _quaternion.slerp(new THREE.Quaternion().setFromAxisAngle(_xUnitVector, Math.PI / 2));
+
+            _applyRotation(vInfo.xunit_lv, vInfo.xunit_lv_obj, _xUnitVector, bone.quaternion);
+            _applyRotation(vInfo.yunit_lv, vInfo.yunit_lv_obj, _yUnitVector, bone.quaternion);
+            _applyRotation(vInfo.zunit_lv, vInfo.zunit_lv_obj, _zUnitVector, bone.quaternion);
+
+            _applyRotation(vInfo.xunit_wv, vInfo.xunit_wv_obj, _xUnitVector, _quaternion);
+            _applyRotation(vInfo.yunit_wv, vInfo.yunit_wv_obj, _yUnitVector, _quaternion);
+            _applyRotation(vInfo.zunit_wv, vInfo.zunit_wv_obj, _zUnitVector, _quaternion);
+
+            _applyRotation(vInfo.lv, vInfo.lv_obj, _yUnitVector, bone.quaternion);
+            _applyRotation(vInfo.wv, vInfo.wv_obj, _yUnitVector, _quaternion);
+
+            // pm_wv
+            let updated = _updateBoneLandmarkVector(bone, results);
+
+            if (!updated) {
+                continue;
+            }
+
+            LIB.positionLineVector(vInfo.pm_wv_obj, [vInfo.pm_wv.x, vInfo.pm_wv.y, vInfo.pm_wv.z]);
+
+            // pm_lv                
+            // vInfo.pm_lv.copy(vInfo.pm_wv);
+            // bone.worldToLocal(vInfo.pm_lv);
+            // vInfo.pm_lv.normalize();
+            _quaternion.setFromUnitVectors(_yUnitVector, vInfo.pm_wv);
+
+            _vector.copy(_yUnitVector);
+            _vector.applyQuaternion(_quaternion);
+
+            _quaternion.copy(bone.parent.quaternion);
+            _quaternion.invert();
+            _vector.applyQuaternion(_quaternion);
+
+            vInfo.pm_lv.copy(_vector);
+
+            LIB.positionLineVector(vInfo.pm_lv_obj, [vInfo.pm_lv.x, vInfo.pm_lv.y, vInfo.pm_lv.z]);
+
+            // finally set the bones rotation!
+            // updated = false;
+            if (updated) {
+                // rotation to go from wv to pm_wv (is the same to go from lv to pm_lv ?)
+                _quaternion.setFromUnitVectors(_yUnitVector, _vector);
+
+
+                // _quaternion.identity();
+                // let idx = parseInt((Date.now() % 100000 / 10000)) % 2;
+                // _quaternion.setFromUnitVectors(_yUnitVector, staticPVectors[idx]);
+                bone.setRotationFromQuaternion(_quaternion);
+            }
+        }
+
+        function _updateBoneLandmarkVector(bone, results) {
+
+            let updated = false;
+
+            let processList = [
+                'mixamorigLeftShoulder_20',
+                'mixamorigRightShoulder_38',
+                'mixamorigRightArm_36',
+                'mixamorigLeftArm_18',
+                'mixamorigLeftForeArm_17',
+                'mixamorigRightForeArm_35'
+            ];
+
+            let shouldProcessBone = false;
+
+            for (var i = 0; i < processList.length; i++) {
+                if (bone.name === processList[i]) {
+                    shouldProcessBone = true;
+                    break;
+                }
+            }
+
+            if (!shouldProcessBone ||
+                !results ||
+                !results.poseLandmarks) {
+                return false;
+            }
+
+            let pm_wv = bone.boneVectorInfo.pm_wv;
+
+            // let markers = results.poseLandmarks;
+            let markers = poseLandmarksSmooth;
+
+            let myLandmark = undefined;
+            let parentLandmark = undefined;
+
+            switch (bone.name) {
+                case 'mixamorigLeftArm_18':
+                    myLandmark = markers[markerIndex['leftElbow']];
+                    parentLandmark = markers[markerIndex['leftShoulder']];
+                    break;
+
+                case 'mixamorigRightArm_36':
+                    myLandmark = markers[markerIndex['rightElbow']];
+                    parentLandmark = markers[markerIndex['rightShoulder']];
+                    break;
+
+                case 'mixamorigLeftForeArm_17':
+                    myLandmark = markers[markerIndex['leftWrist']];
+                    parentLandmark = markers[markerIndex['leftElbow']];
+                    break;
+
+                case 'mixamorigRightForeArm_35':
+                    myLandmark = markers[markerIndex['rightWrist']];
+                    parentLandmark = markers[markerIndex['rightElbow']];
+                    break;
+            }
+
+            if (myLandmark && parentLandmark) {
+                pm_wv.x = myLandmark.x - parentLandmark.x;
+                pm_wv.y = -myLandmark.y + parentLandmark.y;
+                pm_wv.z = -myLandmark.z + parentLandmark.z;
+
+                pm_wv.normalize();
+
+                updated = true;
+            }
+
+            pm_wv.normalize();
+
+            return updated;
+        }
+    }
+
+    function shouldProcessBone(bone) {
+
+        let processList = [
+            'mixamorigLeftShoulder_20',
+            'mixamorigRightShoulder_38',
+            'mixamorigRightArm_36',
+            'mixamorigLeftArm_18',
+            'mixamorigLeftForeArm_17',
+            'mixamorigRightForeArm_35'
+        ];
+
+        for (var i = 0; i < processList.length; i++) {
+            if (bone.name === processList[i]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function initializeWarrior() {
+
+        function _initializeWarrior(warriorSkeleton) {
+            console.log(`initializing warrior skeleton`);
+
+            let xHelperVector = -4;
+            let yHelperVector = 4;
+
+            for (var i = 0; i < warriorSkeleton.bones.length; i++) {
+                let bone = warriorSkeleton.bones[i];
+
+                if (!shouldProcessBone(bone)) {
+                    xHelperVector++;
+                    if (xHelperVector == 0) {
+                        yHelperVector--;
+                        xHelperVector = -4;
+                    }
+                    continue;
+                }
+
+                bone.boneVectorInfo = {
+                    lv: _yUnitVector.clone(),
+                    lv_obj: createLineVectorOnScene([[0, 0, 0], [0, 1, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0xfc0fc0, length: 0.375 }),
+                    wv: _yUnitVector.clone(),
+                    wv_obj: createLineVectorOnScene([[0, 0, 0], [0, 1, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0xffbf00, length: 0.375 }),
+                    pm_lv: _yUnitVector.clone(),
+                    pm_lv_obj: createLineVectorOnScene([[0, 0, 0], [0, 1, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0xcc3366, length: 0.375 }),
+                    pm_wv: _yUnitVector.clone(),
+                    pm_wv_obj: createLineVectorOnScene([[0, 0, 0], [0, 1, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0xff7f50, length: 0.375 }),
+                    xunit_wv: _xUnitVector.clone(),
+                    xunit_wv_obj: createLineVectorOnScene([[0, 0, 0], [1, 0, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0x660000, length: 0.25 }),
+                    xunit_lv: _xUnitVector.clone(),
+                    xunit_lv_obj: createLineVectorOnScene([[0, 0, 0], [1, 0, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0xff0000, length: 0.25 }),
+                    yunit_wv: _yUnitVector.clone(),
+                    yunit_wv_obj: createLineVectorOnScene([[0, 0, 0], [0, 1, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0x006600, length: 0.25 }),
+                    yunit_lv: _yUnitVector.clone(),
+                    yunit_lv_obj: createLineVectorOnScene([[0, 0, 0], [0, 1, 0]], [xHelperVector, yHelperVector, 0], scene, { color: 0x00ee00, length: 0.25 }),
+                    zunit_wv: _zUnitVector.clone(),
+                    zunit_wv_obj: createLineVectorOnScene([[0, 0, 0], [0, 0, 1]], [xHelperVector, yHelperVector, 0], scene, { color: 0x000066, length: 0.25 }),
+                    zunit_lv: _zUnitVector.clone(),
+                    zunit_lv_obj: createLineVectorOnScene([[0, 0, 0], [0, 0, 1]], [xHelperVector, yHelperVector, 0], scene, { color: 0x0000ff, length: 0.25 })
+                };
+
+                xHelperVector++;
+                if (xHelperVector == 0) {
+                    yHelperVector--;
+                    xHelperVector = -4;
+                }
+
+                console.log(`initializing warrior bone ${bone.name} to  identity rotation.`);
+                // bone.quaternion.identity();
+
+                printBoneInfo(bone);
+            }
+
+            //
+
+            updateWarrior();
+        }
+
+        let timer = setInterval(() => {
+
+            if (!warriorLoaded) {
+                console.log(`waiting for warrior to initialize...`);
+                return;
+            }
+
+            let warriorSkeleton = warriorSkeletons[0];
+
+            if (!warriorSkeleton) {
+                console.log(`wierd...warrior skeleton not found after loading`);
+                return;
+            }
+
+            clearInterval(timer);
+
+            _initializeWarrior(warriorSkeleton);
+        }, 1000);
+    }
+
+    function printBoneInfo(bone) {
+
+        _vector.x = bone.position.x;
+        _vector.y = bone.position.y;
+        _vector.z = bone.position.z;
+        _vector.normalize();
+
+        bone.getWorldPosition(_vector2);
+        _vector2.normalize();
+
+        bone.getWorldQuaternion(_quaternion);
+
+        console.log(`orientation of bone ${bone.name} : 
+                    position: ${JSON.stringify(bone.position, null, '\t')}
+                    rotation: ${JSON.stringify(bone.rotation, null, '\t')}
+                    quaternion: ${JSON.stringify(bone.quaternion, null, '\t')}
+                    worldqtrno: ${JSON.stringify(_quaternion, null, '\t')}
+                    direction: [${_vector.x}, ${_vector.y}, ${_vector.z}]}
+                    worlddirn: [${_vector2.x}, ${_vector2.y}, ${_vector2.z}]}
+                `);
+    }
+
+    function getBoneDirectionVector(bone) {
+
+        let dv = bone.position.clone();
+        dv.normalize();
+
+        console.log(`${bone.name} dv=${JSON.stringify(dv)}`);
+
+        return dv;
+    }
+
+    function getBoneWorldDirectionVector(bone) {
+        let dv = _vector.clone();
+        bone.getWorldPosition(dv);
+        dv.normalize();
+        return dv;
+    }
+
+    function loadInputVideo() {
+        var video = document.getElementById('inputVideo');
+        var texture = new THREE.VideoTexture(video);
+        texture.needsUpdate;
+        texture.crossOrigin = 'anonymous';
+
+        var imageObject = new THREE.Mesh(
+            new THREE.PlaneGeometry(320, 240),
+            new THREE.MeshBasicMaterial({ map: texture }));
+
+        imageObject.position.set(9, -6, -8);
+        imageObject.scale.set(0.01, 0.01, 0.01)
+        imageObject.lookAt(camera.position);
+
+        scene.add(imageObject);
+
+        return {
+            videoTexture: texture,
+            videoMesh: imageObject
+        }
+    }
+
+    function loadSegmentMaskedVideo() {
+        var mpvideo = document.getElementById('outputCanvas1');
+        var mptexture = new THREE.Texture(mpvideo);
+        mptexture.needsUpdate;
+        mptexture.crossOrigin = 'anonymous';
+
+        var mpimageObject1 = new THREE.Mesh(
+            new THREE.PlaneGeometry(160, 120),
+            new THREE.MeshBasicMaterial({
+                map: mptexture,
+                transparent: true,
+                opacity: 1.0
+            }));
+
+        mpimageObject1.position.set(6, 3, -6);
+        mpimageObject1.scale.set(0.08, 0.08, 0.08)
+        mpimageObject1.lookAt(camera.position);
+
+        scene.add(mpimageObject1);
+
+        return {
+            segmentMaskedTexture: mptexture,
+            segmentMaskedMesh: mpimageObject1
+        }
+    }
+
+    function loadPositionMarkersVideo() {
+        var mpvideo2 = document.getElementById('outputCanvas2');
+        var mptexture2 = new THREE.Texture(mpvideo2);
+        mptexture2.needsUpdate;
+        mptexture2.crossOrigin = 'anonymous';
+
+        var mpimageObject2 = new THREE.Mesh(
+            new THREE.PlaneGeometry(160, 120),
+            new THREE.MeshBasicMaterial({
+                map: mptexture2,
+                transparent: true,
+                opacity: 1.0
+            }));
+
+        mpimageObject2.position.set(2, 1.5, 0);
+        mpimageObject2.scale.set(0.02, 0.02, 0.02)
+        mpimageObject2.lookAt(camera.position);
+
+        scene.add(mpimageObject2);
+
+        return {
+            positionMarkersTexture: mptexture2,
+            positionMarkersMesh: mpimageObject2
+        }
+    }
+
+    function loadFaceMeshVideo() {
+        var mpvideo3 = document.getElementById('outputCanvas3');
+        var mptexture3 = new THREE.Texture(mpvideo3);
+        mptexture3.needsUpdate;
+        mptexture3.crossOrigin = 'anonymous';
+
+        var mpimageObject3 = new THREE.Mesh(
+            new THREE.PlaneGeometry(160, 120),
+            new THREE.MeshBasicMaterial({
+                map: mptexture3,
+                transparent: true,
+                opacity: 1.0
+            }));
+
+        mpimageObject3.position.set(-4, 1, -6);
+        mpimageObject3.scale.set(0.2, 0.2, 0.2)
+        mpimageObject3.lookAt(camera.position);
+
+        scene.add(mpimageObject3);
+
+        return {
+            faceTexture: mptexture3,
+            faceMesh: mpimageObject3
+        }
+    }
+
+    function loadCanvas4() {
+        var mpvideo4 = document.getElementById('outputCanvas4');
+        var mptexture4 = new THREE.Texture(mpvideo4);
+        mptexture4.needsUpdate;
+        mptexture4.crossOrigin = 'anonymous';
+
+        var mpimageObject4 = new THREE.Mesh(
+            new THREE.PlaneGeometry(160, 120),
+            new THREE.MeshBasicMaterial({
+                map: mptexture4,
+                transparent: true,
+                opacity: 1.0
+            }));
+
+        mpimageObject4.position.set(-6, -3, 0);
+        mpimageObject4.scale.set(0.1, 0.1, 0.1)
+        mpimageObject4.lookAt(camera.position);
+
+        // scene.add(mpimageObject4);
+
+        return {
+            texture4: mptexture4,
+            mesh4: mpimageObject4
+        }
+    }
+
+    function loadCanvas5() {
+        var mpvideo5 = document.getElementById('outputCanvas5');
+        var mptexture5 = new THREE.Texture(mpvideo5);
+        mptexture5.needsUpdate;
+        mptexture5.crossOrigin = 'anonymous';
+
+        var mpimageObject5 = new THREE.Mesh(
+            new THREE.PlaneGeometry(160, 120),
+            new THREE.MeshBasicMaterial({
+                map: mptexture5,
+                transparent: true,
+                opacity: 1.0
+            }));
+
+        mpimageObject5.position.set(6, -3, 0);
+        mpimageObject5.scale.set(0.1, 0.1, 0.1)
+        mpimageObject5.lookAt(camera.position);
+
+        // scene.add(mpimageObject5);
+
+        return {
+            texture5: mptexture5,
+            mesh5: mpimageObject5
+        }
+    }
+
+    let framesPerAnimation = 10;
+    let numElapsedFramesInAnimation = 0;
+
+    function getBoneList(object) {
+
+        const boneList = [];
+
+        if (object && object.isBone) {
+
+            boneList.push(object);
+
+            console.log(`added bone ${object.name}, parent=${object.parent && object.parent.name} numChildren=${object.children && object.children.length || 0}`);
+        }
+
+        for (let i = 0; i < object.children.length; i++) {
+
+            boneList.push.apply(boneList, getBoneList(object.children[i]));
+
+        }
+
+        return boneList;
+    }
+
+
+    const videoElement = document.getElementById('inputVideo');
+
+    const canvasElement = document.getElementById('outputCanvas1');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    const canvasElement2 = document.getElementById('outputCanvas2');
+    const canvasCtx2 = canvasElement2.getContext('2d');
+
+    const canvasElement3 = document.getElementById('outputCanvas3');
+    const canvasCtx3 = canvasElement3.getContext('2d');
+
+    const canvasElement4 = document.getElementById('outputCanvas4');
+    const canvasCtx4 = canvasElement4.getContext('2d');
+
+    const canvasElement5 = document.getElementById('outputCanvas5');
+    const canvasCtx5 = canvasElement5.getContext('2d');
+
+
+    function createLineVectorOnScene(points, location, scene, opts) {
+        let LineVector = LIB.createLineVector(points, opts);
+        LIB.centerLineVector(LineVector, location);
+        LIB.addLineVectorToScene(LineVector, scene);
+        let LineAxes = LIB.createAxes();
+        LIB.updateAxes(LineAxes, location);
+        LIB.addAxesToScene(LineAxes, scene);
+
+        return LineVector;
+    }
+
+    let bodySkeleton = undefined;
+
+    let points = [];
+    for (var i = 0; i < 34; i++) {
+        points.push(new THREE.Vector3(0, 0, 0));
+    }
+
+    const skeletonGeometry = new THREE.BufferGeometry().setFromPoints(points);
+    const skeletonMaterial = new THREE.LineBasicMaterial({
+        color: 0x0000ff
+    });
+
+    const skeletonMesh = new THREE.Line(skeletonGeometry, skeletonMaterial);
+
+    const shoulderLandmarkMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+
+    const shouldersLandmarkPoints = [];
+    shouldersLandmarkPoints.push(new THREE.Vector3(-5, -5, -5));
+    shouldersLandmarkPoints.push(new THREE.Vector3(5, 5, 5));
+
+    const shouldersLandmarkGeometry = new THREE.BufferGeometry().setFromPoints(shouldersLandmarkPoints);
+    const shouldersLandmarkLine = new THREE.Line(shouldersLandmarkGeometry, shoulderLandmarkMaterial);
+
+    scene.add(shouldersLandmarkLine);
+
+
+    const yRotate90Quaternion = new THREE.Quaternion();
+    yRotate90Quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+
+    const xRotate90Quaternion = new THREE.Quaternion();
+    xRotate90Quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+
+    const zRotate90Quaternion = new THREE.Quaternion();
+    zRotate90Quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+
+    const yRotateNeg90Quaternion = new THREE.Quaternion();
+    yRotateNeg90Quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), - Math.PI / 2);
+
+    const xRotateNeg90Quaternion = new THREE.Quaternion();
+    xRotateNeg90Quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), - Math.PI / 2);
+
+    const zRotateNeg90Quaternion = new THREE.Quaternion();
+    zRotateNeg90Quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), - Math.PI / 2);
+
+    let mainAxes = LIB.createAxes();
+    let rootBoneAxes = LIB.createAxes();
+    let hipBoneAxes = LIB.createAxes();
+    let spineLowerBoneAxes = LIB.createAxes();
+    let spineMiddleBoneAxes = LIB.createAxes();
+    let spineUpperBoneAxes = LIB.createAxes();
+    let leftShoulderBoneAxes = LIB.createAxes();
+    let leftArmBoneAxes = LIB.createAxes();
+    let leftForeArmBoneAxes = LIB.createAxes();
+    let leftHandBoneAxes = LIB.createAxes();
+
+    LIB.addAxesToScene(mainAxes, scene);
+
+    let poseLandmarksSmooth = undefined;
+
+    function positionSkeletonFromMarkers(skeleton, results) {
+
+        // console.log(`[positionSkeletonFromMarkers] skeleton=${JSON.stringify(skeleton)}`);
+        // console.log(`[positionSkeletonFromMarkers] results.poseLandmarks=${JSON.stringify(results.poseLandmarks)}`);
+
+        if (!results.poseLandmarks) {
+            return;
+        }
+
+        if (!poseLandmarksSmooth) {
+            poseLandmarksSmooth = Object.assign({}, results.poseLandmarks);
+        }
+
+        let alpha = 0.9;
+        for (var i = 0; i < 33; i++) {
+
+            let x = poseLandmarksSmooth[i].x;
+            let y = poseLandmarksSmooth[i].y;
+            let z = poseLandmarksSmooth[i].z;
+
+            x = alpha * x + ((1.0 - alpha) * results.poseLandmarks[i].x);
+            y = alpha * y + ((1.0 - alpha) * results.poseLandmarks[i].y);
+            z = alpha * z + ((1.0 - alpha) * results.poseLandmarks[i].z);
+
+            poseLandmarksSmooth[i].x = x;
+            poseLandmarksSmooth[i].y = y;
+            poseLandmarksSmooth[i].z = z;
+        }
+
+        let noseLandmark = poseLandmarksSmooth[0];
+        let leftEyeInnerLandmark = poseLandmarksSmooth[1];
+        let leftEyeLandmark = poseLandmarksSmooth[2];
+        let leftEyeOuterLandmark = poseLandmarksSmooth[3];
+        let rightEyeInnerLandmark = poseLandmarksSmooth[4];
+        let rightEyeLandmark = poseLandmarksSmooth[5];
+        let rightEyeOuterLandmark = poseLandmarksSmooth[6];
+        let leftEarLandmark = poseLandmarksSmooth[7];
+        let rightEarLandmark = poseLandmarksSmooth[8];
+        let mouthLeftLandmark = poseLandmarksSmooth[9];
+        let mouthRightLandmark = poseLandmarksSmooth[10];
+        let leftShoulderLandmark = poseLandmarksSmooth[11]; //.
+        let rightShoulderLandmark = poseLandmarksSmooth[12]; //.
+        let leftElbowLandmark = poseLandmarksSmooth[13];
+        let rightElbowLandmark = poseLandmarksSmooth[14];
+        let leftWristLandmark = poseLandmarksSmooth[15];
+        let rightWristLandmark = poseLandmarksSmooth[16];
+        let leftPinkyLandmark = poseLandmarksSmooth[17];
+        let rightPinkyLandmark = poseLandmarksSmooth[18];
+        let leftIndexLandmark = poseLandmarksSmooth[19];
+        let rightIndexLandmark = poseLandmarksSmooth[20];
+        let leftThumbLandmark = poseLandmarksSmooth[21];
+        let rightThumbLandmark = poseLandmarksSmooth[22];
+        let leftHipLandmark = poseLandmarksSmooth[23]; //
+        let rightHipLandmark = poseLandmarksSmooth[24]; //
+        let leftKneeLandmark = poseLandmarksSmooth[25];
+        let rightKneeLandmark = poseLandmarksSmooth[26];
+        let leftAnkleLandmark = poseLandmarksSmooth[27];
+        let rightAnkleLandmark = poseLandmarksSmooth[28];
+        let leftHeelLandmark = poseLandmarksSmooth[29];
+        let rightHeelLandmark = poseLandmarksSmooth[30];
+        let leftFootIndexLandmark = poseLandmarksSmooth[31];
+        let rightFootIndexLandmark = poseLandmarksSmooth[32];
+
+        // second order markers
+
+        let ankleCenterLandmark = {
+            x: (leftAnkleLandmark.x + rightAnkleLandmark.x) / 2,
+            y: (leftAnkleLandmark.y + rightAnkleLandmark.y) / 2,
+            z: (leftAnkleLandmark.z + rightAnkleLandmark.z) / 2
+        }
+
+        let hipCenterLandmark = {
+            x: (leftHipLandmark.x + rightHipLandmark.x) / 2,
+            y: (leftHipLandmark.y + rightHipLandmark.y) / 2,
+            z: (leftHipLandmark.z + rightHipLandmark.z) / 2
+        }
+
+        let hipLandmark = {
+            x: (leftHipLandmark.x - rightHipLandmark.x),
+            y: (leftHipLandmark.y - rightHipLandmark.y),
+            z: (leftHipLandmark.z - rightHipLandmark.z)
+        }
+
+        let shoulderCenterLandmark = {
+            x: (leftShoulderLandmark.x + rightShoulderLandmark.x) / 2,
+            y: (leftShoulderLandmark.y + rightShoulderLandmark.y) / 2,
+            z: (leftShoulderLandmark.z + rightShoulderLandmark.z) / 2
+        }
+
+        let shoulderLandmark = {
+            x: (leftShoulderLandmark.x - rightShoulderLandmark.x),
+            y: (leftShoulderLandmark.y - rightShoulderLandmark.y),
+            z: (leftShoulderLandmark.z - rightShoulderLandmark.z)
+        }
+
+        let mouthCenterLandmark = {
+            x: (mouthLeftLandmark.x + mouthRightLandmark.x) / 2,
+            y: (mouthLeftLandmark.y + mouthRightLandmark.y) / 2,
+            z: (mouthLeftLandmark.z + mouthRightLandmark.z) / 2
+        }
+
+        let earCenterLandmark = {
+            x: (leftEarLandmark.x + rightEarLandmark.x) / 2,
+            y: (leftEarLandmark.y + rightEarLandmark.y) / 2,
+            z: (leftEarLandmark.z + rightEarLandmark.z) / 2
+        }
+
+        let eyeCenterLandmark = {
+            x: (leftEyeLandmark.x + rightEyeLandmark.x) / 2,
+            y: (leftEyeLandmark.y + rightEyeLandmark.y) / 2,
+            z: (leftEyeLandmark.z + rightEyeLandmark.z) / 2
+        }
+
+        let noseCenterLandmark = {
+            x: noseLandmark.x,
+            y: noseLandmark.y,
+            z: noseLandmark.z
+        }
+
+
+        let rootBone = skeleton.getBoneByName('GLTF_created_0_rootJoint');
+        let hipBone = skeleton.getBoneByName('mixamorigHips_52');
+        let spineLowerBone = skeleton.getBoneByName('mixamorigSpine_41');
+        let spineMiddleBone = skeleton.getBoneByName('mixamorigSpine1_40');
+        let spineUpperBone = skeleton.getBoneByName('mixamorigSpine2_39');
+        let leftShoulderBone = skeleton.getBoneByName('mixamorigLeftShoulder_20');
+        let rightShoulderBone = skeleton.getBoneByName('mixamorigRightShoulder_38');
+        let leftArmBone = skeleton.getBoneByName('mixamorigLeftArm_18');
+        let rightArmBone = skeleton.getBoneByName('mixamorigRightArm_36');
+        let leftForeArmBone = skeleton.getBoneByName('mixamorigLeftForeArm_17');
+        let rightForeArmBone = skeleton.getBoneByName('mixamorigRightArm_36');
+        let leftHandBone = skeleton.getBoneByName('mixamorigLeftHand_16');
+        let rightHandBone = skeleton.getBoneByName('mixamorigRightHand_34');
+
+        // 
+
+        let headBone = skeleton.getBoneByName('mixamorigHead_1');
+
+        // spineUpperBone.setRotationFromQuaternion(shoulderQuaternion);
+        spineUpperBone.needsUpdate = true;
+
+        // spineMiddleBone.setRotationFromQuaternion(shoulderQuaternion);
+        spineMiddleBone.needsUpdate = true;
+
+        // spineLowerBone.setRotationFromQuaternion(shoulderQuaternion);
+        spineLowerBone.needsUpdate = true;
+
+        hipBone.needsUpdate = true;
+
+        spineUpperBone.needsUpdate = true;
+
+        warriorScene.needsUpdate = true;
+
+        canvasCtx4.save();
+        canvasCtx4.clearRect(0, 0, canvasElement4.width, canvasElement4.height);
+        canvasCtx4.restore();
+    }
+
+    function onResults(results) {
+
+        if (!results ||
+            !results.segmentationMask ||
+            !results.image) {
+            return;
+        }
+
+        if (!warriorSkeletons[0]) {
+            console.log(`no warrior`);
+            return;
+        }
+
+        positionSkeletonFromMarkers(warriorSkeletons[0], results);
+        updateWarrior(results);
+
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(
+            results.segmentationMask, 0, 0, canvasElement.width, canvasElement.height);
+
+        // Only overwrite missing pixels.
+        canvasCtx.globalCompositeOperation = 'source-in';
+        canvasCtx.drawImage(
+            results.image, 0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.restore();
+
+        canvasCtx2.save();
+        canvasCtx2.clearRect(0, 0, canvasElement2.width, canvasElement2.height);
+
+        if (results.poseLandmarks) {
+
+            // console.log(`${JSON.stringify(results.poseLandmarks, null, '\t')}`);
+
+            drawConnectors(canvasCtx2, results.poseLandmarks, POSE_CONNECTIONS,
+                { color: '#00FF00', lineWidth: 4 });
+            drawLandmarks(canvasCtx2, results.poseLandmarks,
+                { color: '#FF0000', lineWidth: 2 });
+
+
+        }
+
+        if (results.leftHandLandmarks) {
+            drawConnectors(canvasCtx2, results.leftHandLandmarks, HAND_CONNECTIONS,
+                { color: '#CC0000', lineWidth: 5 });
+            drawLandmarks(canvasCtx2, results.leftHandLandmarks,
+                { color: '#00FF00', lineWidth: 2 });
+        }
+
+        if (results.rightHandLandmarks) {
+            drawConnectors(canvasCtx2, results.rightHandLandmarks, HAND_CONNECTIONS,
+                { color: '#00CC00', lineWidth: 5 });
+            drawLandmarks(canvasCtx2, results.rightHandLandmarks,
+                { color: '#FF0000', lineWidth: 2 });
+        }
+
+        canvasCtx2.restore();
+
+        canvasCtx3.save();
+        canvasCtx3.clearRect(0, 0, canvasElement3.width, canvasElement3.height);
+        if (results.faceLandmarks) {
+            drawConnectors(canvasCtx3, results.faceLandmarks, FACEMESH_TESSELATION,
+                { color: '#C0C0C070', lineWidth: 1 });
+        }
+        canvasCtx3.restore();
+
+        canvasCtx5.save();
+        canvasCtx5.clearRect(0, 0, canvasElement5.width, canvasElement5.height);
+        canvasCtx5.restore();
+    }
+
+    const holistic = new Holistic({
+        locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${file}`;
+        }
+    });
+
+    holistic.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: true,
+        smoothSegmentation: true,
+        refineFaceLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+
+    holistic.onResults(onResults);
+
+    const hcamera = new Camera(videoElement, {
+        onFrame: async () => {
+            await holistic.send({ image: videoElement });
+        },
+        width: 640,
+        height: 480
+    });
+
+    hcamera.start();
+
+    function animate() {
+
+        requestAnimationFrame(animate);
+
+        videoTexture.needsUpdate = true;
+        segmentMaskedTexture.needsUpdate = true;
+        positionMarkersTexture.needsUpdate = true;
+        faceTexture.needsUpdate = true;
+        texture4.needsUpdate = true;
+        texture5.needsUpdate = true;
+
+        shouldersLandmarkLine.needsUpdate = true;
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+</script>
+
+</html>
