@@ -8,6 +8,9 @@
     <style>
         body {
             background-color: transparent;
+            background: url('/rothko14.jpeg') no-repeat center center fixed;
+            background-size: cover;
+            /* background-image: url('/rothko14.jpeg'); */
         }
     </style>
     <!-- mediapipe -->
@@ -177,7 +180,7 @@
     // functions
     function setupScene() {
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0xf4f4f4);
+        // scene.background = new THREE.Color(0xf4f4f4);
 
         var ambientLight = new THREE.AmbientLight(0xffffff);
         scene.add(ambientLight);
@@ -201,11 +204,12 @@
 
         scene.add(camera);
 
-        const renderer = new THREE.WebGLRenderer();
+        const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
 
-        renderer.gammaInput = true;
-        renderer.gammaOutput = true;
+        // renderer.gammaInput = true;
+        // renderer.gammaOutput = true;
 
         var controls = new OrbitControls(camera, renderer.domElement);
 
@@ -801,10 +805,7 @@
 
     let poseLandmarksSmooth = undefined;
 
-    function positionSkeletonFromMarkers(skeleton, results) {
-
-        // console.log(`[positionSkeletonFromMarkers] skeleton=${JSON.stringify(skeleton)}`);
-        // console.log(`[positionSkeletonFromMarkers] results.poseLandmarks=${JSON.stringify(results.poseLandmarks)}`);
+    function updateInputDriver(results) {
 
         if (!results.poseLandmarks) {
             return;
@@ -920,44 +921,173 @@
             z: noseLandmark.z
         }
 
-
-        let rootBone = skeleton.getBoneByName('GLTF_created_0_rootJoint');
-        let hipBone = skeleton.getBoneByName('mixamorigHips_52');
-        let spineLowerBone = skeleton.getBoneByName('mixamorigSpine_41');
-        let spineMiddleBone = skeleton.getBoneByName('mixamorigSpine1_40');
-        let spineUpperBone = skeleton.getBoneByName('mixamorigSpine2_39');
-        let leftShoulderBone = skeleton.getBoneByName('mixamorigLeftShoulder_20');
-        let rightShoulderBone = skeleton.getBoneByName('mixamorigRightShoulder_38');
-        let leftArmBone = skeleton.getBoneByName('mixamorigLeftArm_18');
-        let rightArmBone = skeleton.getBoneByName('mixamorigRightArm_36');
-        let leftForeArmBone = skeleton.getBoneByName('mixamorigLeftForeArm_17');
-        let rightForeArmBone = skeleton.getBoneByName('mixamorigRightArm_36');
-        let leftHandBone = skeleton.getBoneByName('mixamorigLeftHand_16');
-        let rightHandBone = skeleton.getBoneByName('mixamorigRightHand_34');
-
-        // 
-
-        let headBone = skeleton.getBoneByName('mixamorigHead_1');
-
-        // spineUpperBone.setRotationFromQuaternion(shoulderQuaternion);
-        spineUpperBone.needsUpdate = true;
-
-        // spineMiddleBone.setRotationFromQuaternion(shoulderQuaternion);
-        spineMiddleBone.needsUpdate = true;
-
-        // spineLowerBone.setRotationFromQuaternion(shoulderQuaternion);
-        spineLowerBone.needsUpdate = true;
-
-        hipBone.needsUpdate = true;
-
-        spineUpperBone.needsUpdate = true;
-
-        warriorScene.needsUpdate = true;
-
-        canvasCtx4.save();
-        canvasCtx4.clearRect(0, 0, canvasElement4.width, canvasElement4.height);
-        canvasCtx4.restore();
+        console.log(`[inputDriver] updated position markers from results` );
     }
+
+    function positionHandCursorsFromMarkers(results, inputDriverContext) {
+
+        let handCursorContext = {};
+
+        return handCursorContext;
+    }    
+
+    // function positionSkeletonFromMarkers(skeleton, results) {
+
+    //     // console.log(`[positionSkeletonFromMarkers] skeleton=${JSON.stringify(skeleton)}`);
+    //     // console.log(`[positionSkeletonFromMarkers] results.poseLandmarks=${JSON.stringify(results.poseLandmarks)}`);
+
+    //     if (!results.poseLandmarks) {
+    //         return;
+    //     }
+
+    //     if (!poseLandmarksSmooth) {
+    //         poseLandmarksSmooth = Object.assign({}, results.poseLandmarks);
+    //     }
+
+    //     let alpha = 0.9;
+    //     for (var i = 0; i < 33; i++) {
+
+    //         let x = poseLandmarksSmooth[i].x;
+    //         let y = poseLandmarksSmooth[i].y;
+    //         let z = poseLandmarksSmooth[i].z;
+
+    //         x = alpha * x + ((1.0 - alpha) * results.poseLandmarks[i].x);
+    //         y = alpha * y + ((1.0 - alpha) * results.poseLandmarks[i].y);
+    //         z = alpha * z + ((1.0 - alpha) * results.poseLandmarks[i].z);
+
+    //         poseLandmarksSmooth[i].x = x;
+    //         poseLandmarksSmooth[i].y = y;
+    //         poseLandmarksSmooth[i].z = z;
+    //     }
+
+    //     let noseLandmark = poseLandmarksSmooth[0];
+    //     let leftEyeInnerLandmark = poseLandmarksSmooth[1];
+    //     let leftEyeLandmark = poseLandmarksSmooth[2];
+    //     let leftEyeOuterLandmark = poseLandmarksSmooth[3];
+    //     let rightEyeInnerLandmark = poseLandmarksSmooth[4];
+    //     let rightEyeLandmark = poseLandmarksSmooth[5];
+    //     let rightEyeOuterLandmark = poseLandmarksSmooth[6];
+    //     let leftEarLandmark = poseLandmarksSmooth[7];
+    //     let rightEarLandmark = poseLandmarksSmooth[8];
+    //     let mouthLeftLandmark = poseLandmarksSmooth[9];
+    //     let mouthRightLandmark = poseLandmarksSmooth[10];
+    //     let leftShoulderLandmark = poseLandmarksSmooth[11]; //.
+    //     let rightShoulderLandmark = poseLandmarksSmooth[12]; //.
+    //     let leftElbowLandmark = poseLandmarksSmooth[13];
+    //     let rightElbowLandmark = poseLandmarksSmooth[14];
+    //     let leftWristLandmark = poseLandmarksSmooth[15];
+    //     let rightWristLandmark = poseLandmarksSmooth[16];
+    //     let leftPinkyLandmark = poseLandmarksSmooth[17];
+    //     let rightPinkyLandmark = poseLandmarksSmooth[18];
+    //     let leftIndexLandmark = poseLandmarksSmooth[19];
+    //     let rightIndexLandmark = poseLandmarksSmooth[20];
+    //     let leftThumbLandmark = poseLandmarksSmooth[21];
+    //     let rightThumbLandmark = poseLandmarksSmooth[22];
+    //     let leftHipLandmark = poseLandmarksSmooth[23]; //
+    //     let rightHipLandmark = poseLandmarksSmooth[24]; //
+    //     let leftKneeLandmark = poseLandmarksSmooth[25];
+    //     let rightKneeLandmark = poseLandmarksSmooth[26];
+    //     let leftAnkleLandmark = poseLandmarksSmooth[27];
+    //     let rightAnkleLandmark = poseLandmarksSmooth[28];
+    //     let leftHeelLandmark = poseLandmarksSmooth[29];
+    //     let rightHeelLandmark = poseLandmarksSmooth[30];
+    //     let leftFootIndexLandmark = poseLandmarksSmooth[31];
+    //     let rightFootIndexLandmark = poseLandmarksSmooth[32];
+
+    //     // second order markers
+
+    //     let ankleCenterLandmark = {
+    //         x: (leftAnkleLandmark.x + rightAnkleLandmark.x) / 2,
+    //         y: (leftAnkleLandmark.y + rightAnkleLandmark.y) / 2,
+    //         z: (leftAnkleLandmark.z + rightAnkleLandmark.z) / 2
+    //     }
+
+    //     let hipCenterLandmark = {
+    //         x: (leftHipLandmark.x + rightHipLandmark.x) / 2,
+    //         y: (leftHipLandmark.y + rightHipLandmark.y) / 2,
+    //         z: (leftHipLandmark.z + rightHipLandmark.z) / 2
+    //     }
+
+    //     let hipLandmark = {
+    //         x: (leftHipLandmark.x - rightHipLandmark.x),
+    //         y: (leftHipLandmark.y - rightHipLandmark.y),
+    //         z: (leftHipLandmark.z - rightHipLandmark.z)
+    //     }
+
+    //     let shoulderCenterLandmark = {
+    //         x: (leftShoulderLandmark.x + rightShoulderLandmark.x) / 2,
+    //         y: (leftShoulderLandmark.y + rightShoulderLandmark.y) / 2,
+    //         z: (leftShoulderLandmark.z + rightShoulderLandmark.z) / 2
+    //     }
+
+    //     let shoulderLandmark = {
+    //         x: (leftShoulderLandmark.x - rightShoulderLandmark.x),
+    //         y: (leftShoulderLandmark.y - rightShoulderLandmark.y),
+    //         z: (leftShoulderLandmark.z - rightShoulderLandmark.z)
+    //     }
+
+    //     let mouthCenterLandmark = {
+    //         x: (mouthLeftLandmark.x + mouthRightLandmark.x) / 2,
+    //         y: (mouthLeftLandmark.y + mouthRightLandmark.y) / 2,
+    //         z: (mouthLeftLandmark.z + mouthRightLandmark.z) / 2
+    //     }
+
+    //     let earCenterLandmark = {
+    //         x: (leftEarLandmark.x + rightEarLandmark.x) / 2,
+    //         y: (leftEarLandmark.y + rightEarLandmark.y) / 2,
+    //         z: (leftEarLandmark.z + rightEarLandmark.z) / 2
+    //     }
+
+    //     let eyeCenterLandmark = {
+    //         x: (leftEyeLandmark.x + rightEyeLandmark.x) / 2,
+    //         y: (leftEyeLandmark.y + rightEyeLandmark.y) / 2,
+    //         z: (leftEyeLandmark.z + rightEyeLandmark.z) / 2
+    //     }
+
+    //     let noseCenterLandmark = {
+    //         x: noseLandmark.x,
+    //         y: noseLandmark.y,
+    //         z: noseLandmark.z
+    //     }
+
+
+    //     let rootBone = skeleton.getBoneByName('GLTF_created_0_rootJoint');
+    //     let hipBone = skeleton.getBoneByName('mixamorigHips_52');
+    //     let spineLowerBone = skeleton.getBoneByName('mixamorigSpine_41');
+    //     let spineMiddleBone = skeleton.getBoneByName('mixamorigSpine1_40');
+    //     let spineUpperBone = skeleton.getBoneByName('mixamorigSpine2_39');
+    //     let leftShoulderBone = skeleton.getBoneByName('mixamorigLeftShoulder_20');
+    //     let rightShoulderBone = skeleton.getBoneByName('mixamorigRightShoulder_38');
+    //     let leftArmBone = skeleton.getBoneByName('mixamorigLeftArm_18');
+    //     let rightArmBone = skeleton.getBoneByName('mixamorigRightArm_36');
+    //     let leftForeArmBone = skeleton.getBoneByName('mixamorigLeftForeArm_17');
+    //     let rightForeArmBone = skeleton.getBoneByName('mixamorigRightArm_36');
+    //     let leftHandBone = skeleton.getBoneByName('mixamorigLeftHand_16');
+    //     let rightHandBone = skeleton.getBoneByName('mixamorigRightHand_34');
+
+    //     // 
+
+    //     let headBone = skeleton.getBoneByName('mixamorigHead_1');
+
+    //     // spineUpperBone.setRotationFromQuaternion(shoulderQuaternion);
+    //     spineUpperBone.needsUpdate = true;
+
+    //     // spineMiddleBone.setRotationFromQuaternion(shoulderQuaternion);
+    //     spineMiddleBone.needsUpdate = true;
+
+    //     // spineLowerBone.setRotationFromQuaternion(shoulderQuaternion);
+    //     spineLowerBone.needsUpdate = true;
+
+    //     hipBone.needsUpdate = true;
+
+    //     spineUpperBone.needsUpdate = true;
+
+    //     warriorScene.needsUpdate = true;
+
+    //     canvasCtx4.save();
+    //     canvasCtx4.clearRect(0, 0, canvasElement4.width, canvasElement4.height);
+    //     canvasCtx4.restore();
+    // }
 
     function onResults(results) {
 
@@ -972,8 +1102,14 @@
             return;
         }
 
-        positionSkeletonFromMarkers(warriorSkeletons[0], results);
-        updateWarrior(results);
+        //
+        /// uptil later
+        // positionSkeletonFromMarkers(warriorSkeletons[0], results);
+        // updateWarrior(results);
+        //
+        
+        let inputDriverContext = updateInputDriver(results);
+        let handCursorContext = positionHandCursorsFromMarkers(results, inputDriverContext)
 
         canvasCtx.save();
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
